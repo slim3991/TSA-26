@@ -17,8 +17,7 @@ def load_dataset(length: int = 2000) -> npt.NDArray:
     """
     T = np.load("./raw_data/abiline_ten.npy")
     Tp = np.sum(np.sum(T, axis=0), axis=0)[:length]
-    Tp = Tp / NODES_IN_DATASET
-    return Tp
+    return Tp / NODES_IN_DATASET
 
 
 def make_train_test_split(
@@ -40,32 +39,36 @@ def make_acf_plots(data: npt.NDArray) -> None:
     plt.show()
 
 
+def make_basic_plot(data: npt.NDArray) -> None:
+    plt.plot(data)
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+
 def preprocess(data: npt.NDArray) -> npt.NDArray:
     """
     Preprocessing function. Aim is to make the series sationary.
     """
     T = data.copy()
-    data = np.diff(T, 1)
+    T = np.diff(T, 1)
     seasonal_lag = TIME_STEPS_PER_DAY
-    T_final = T[seasonal_lag:] - T[:-seasonal_lag]
-    return T_final
+    T = T[seasonal_lag:] - T[:-seasonal_lag]
+    return T
 
 
-def undo_preprocess(
-    forecast: npt.NDArray, history: npt.NDArray, seasonal_lag: int
-) -> npt.NDArray:
-    """
-    AI generated function
-    """
-    undone = np.zeros_like(forecast)
-    for i in range(len(forecast)):
+def undo_preprocess(forecast_diff, train_raw, seasonal_lag):
+    train_diff_1 = np.diff(train_raw, n=1)
+    undone_diff_1 = np.zeros(len(forecast_diff))
+    for i in range(len(forecast_diff)):
         val_lag = (
-            history[-(seasonal_lag - i)]
+            train_diff_1[-(seasonal_lag - i)]
             if (seasonal_lag - i) > 0
-            else undone[i - seasonal_lag]
+            else undone_diff_1[i - seasonal_lag]
         )
-        undone[i] = forecast[i] + val_lag
-    return undone
+        undone_diff_1[i] = forecast_diff[i] + val_lag
+    forecast_final = np.cumsum(undone_diff_1) + train_raw[-1]
+
+    return forecast_final
 
 
 def fit_model(
@@ -110,11 +113,19 @@ def plot_validation(train_raw, test_raw, forecast, title="Model Validation"):
     plt.show()
 
 
+# Just nu är funkar modellen men ett problem som uppstår är att test datan hamnar på en helg
+# så en modell anpassas på vecko data men utvärderas på helg data då trafiken är lägre.
+# En lösning är bara att shifta vart vi börjar mäta.
+
+
 def main():
     Tp = load_dataset(length=2000)
     train_raw, test_raw = make_train_test_split(Tp, 0.8)
     train_processed = preprocess(train_raw)
-    check_stationarity(train_processed)  # ger ett p-värde på 0.29 så inte sationär ännu
+    check_stationarity(train_processed)
+    # make_basic_plot(train_processed)
+    # make_acf_plots(train_processed)
+    # exit()
 
     ar, ma = 2, 3
     results, _ = fit_model(train_processed, ar, ma)
