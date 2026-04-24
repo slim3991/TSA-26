@@ -54,6 +54,9 @@ def preprocess(data: npt.NDArray) -> npt.NDArray:
 def undo_preprocess(
     forecast: npt.NDArray, history: npt.NDArray, seasonal_lag: int
 ) -> npt.NDArray:
+    """
+    AI generated function
+    """
     undone = np.zeros_like(forecast)
     for i in range(len(forecast)):
         val_lag = (
