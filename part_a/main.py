@@ -11,7 +11,7 @@ Tp = Tp / np.mean(Tp)
 
 
 def make_acf_plots(Tp):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    _, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
     plot_acf(Tp, ax=ax1, lags=40)
     ax1.set_title("Autocorrelation Function (ACF)")
     plot_pacf(Tp, ax=ax2, lags=40, method="ywm")
@@ -23,4 +23,5 @@ def make_acf_plots(Tp):
 Tp = np.diff(Tp, 1)
 seasonal_lag = 12 * 24
 Tp_final = Tp[seasonal_lag:] - Tp[:-seasonal_lag]
+
 make_acf_plots(Tp_final)
