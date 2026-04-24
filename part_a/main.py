@@ -6,7 +6,19 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.arima.model import ARIMA, ARIMAResults
 from statsmodels.tsa.stattools import adfuller
 
+# The dataset is is the
 TIME_STEPS_PER_DAY = 12 * 24
+NODES_IN_DATASET = 12**2
+
+
+def load_dataset(length: int = 2000) -> npt.NDArray:
+    """
+    Returns the average trafic in the dataset.
+    """
+    T = np.load("./raw_data/abiline_ten.npy")
+    Tp = np.sum(np.sum(T, axis=0), axis=0)[:length]
+    Tp = Tp / NODES_IN_DATASET
+    return Tp
 
 
 def make_train_test_split(
@@ -15,7 +27,6 @@ def make_train_test_split(
     cutoff = int(len(data) * train_ratio)
     train = data[:cutoff]
     test = data[cutoff:]
-
     return train, test
 
 
@@ -30,6 +41,9 @@ def make_acf_plots(data: npt.NDArray) -> None:
 
 
 def preprocess(data: npt.NDArray) -> npt.NDArray:
+    """
+    Preprocessing function. Aim is to make the series sationary.
+    """
     T = data.copy()
     data = np.diff(T, 1)
     seasonal_lag = TIME_STEPS_PER_DAY
@@ -54,12 +68,18 @@ def undo_preprocess(
 def fit_model(
     Tp: npt.NDArray, ar_component: int, ma_component: int
 ) -> Tuple[ARIMAResults, ARIMA]:
+    """
+    Fits model...
+    """
     model = ARIMA(Tp, order=(ar_component, 0, ma_component))
     results = model.fit()
     return results, model
 
 
 def check_stationarity(data: npt.NDArray) -> None:
+    """
+    Checks if the dataset is statiionary using the ADF test
+    """
     result = adfuller(data, maxlag=TIME_STEPS_PER_DAY)
     print(f"ADF Statistic: {result[0]}")
     print(f"p-value: {result[1]}")
@@ -67,7 +87,7 @@ def check_stationarity(data: npt.NDArray) -> None:
 
 def plot_validation(train_raw, test_raw, forecast, title="Model Validation"):
     """
-    AI genererad function
+    AI generated function
     """
     plt.figure(figsize=(12, 6))
 
@@ -88,17 +108,10 @@ def plot_validation(train_raw, test_raw, forecast, title="Model Validation"):
 
 
 def main():
-    T = np.load("./raw_data/abiline_ten.npy")
-    Tp = np.sum(np.sum(T, axis=0), axis=0)[:1500]
-    Tp = Tp / 12**2
-
-    # plt.plot(Tp)
-    # plt.show()
+    Tp = load_dataset(length=2000)
     train_raw, test_raw = make_train_test_split(Tp, 0.8)
-
     train_processed = preprocess(train_raw)
-
-    check_stationarity(train_processed)
+    check_stationarity(train_processed)  # ger ett p-värde på 0.29 så inte sationär ännu
 
     ar, ma = 2, 3
     results, _ = fit_model(train_processed, ar, ma)
