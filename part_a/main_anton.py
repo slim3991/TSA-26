@@ -19,7 +19,7 @@ def load_dataset(length: int = 6000, start: int = 20000) -> npt.NDArray:
 """
 
 #"""
-def load_dataset(length: int = 6000, start: int = 26070) -> npt.NDArray:
+def load_dataset(length: int = 4000, start: int = 23955) -> npt.NDArray:
     """
     Returns the median traffic in the dataset across all node pairs.
     """
@@ -100,38 +100,6 @@ def check_stationarity(data: npt.NDArray) -> None:
     print(f"p-value: {result[1]}")
 
 
-def plot_stationary_forecast(train_processed: npt.NDArray, forecast_diff: npt.NDArray, 
-    title: str = "Stationary Series and Forecast (Differenced Domain)"
-) -> None:
-    """
-    Plots the processed (stationary) training data alongside the forecast
-    in the differenced domain.
-
-    AI generated
-    """
-    plt.figure(figsize=(12, 6))
-
-    # Plot the stationary training data
-    # Note: We plot the last portion to avoid an overly dense graph if the series is long
-    display_cutoff = max(0, len(train_processed) - 1000) 
-    train_idx = range(display_cutoff, len(train_processed))
-    
-    plt.plot(train_idx, train_processed[display_cutoff:], label="Processed Train (Stationary)", color="blue", alpha=0.5)
-
-    # Plot the forecast in the stationary domain
-    forecast_idx = np.arange(len(train_processed), len(train_processed) + len(forecast_diff))
-    plt.plot(forecast_idx, forecast_diff, label="Forecast (Differenced)", color="red", linestyle="--")
-
-    # Add a horizontal line at zero to represent the expected mean of the stationary series
-    plt.axhline(0, color='black', linestyle=':', alpha=0.5, label='Zero Mean')
-
-    plt.title(title)
-    plt.xlabel("Time Steps")
-    plt.ylabel("Differenced Traffic")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
-
 
 def plot_validation(train_raw, test_raw, forecast, lower_bound=None, upper_bound=None, 
                     title="Model Validation"):
@@ -168,8 +136,14 @@ def plot_validation(train_raw, test_raw, forecast, lower_bound=None, upper_bound
 def main():
     Tp = load_dataset()
     train_raw, test_raw = make_train_test_split(Tp, 0.9)
-    train_processed = preprocess(train_raw)
-    #check_stationarity(train_processed)
+    
+    # CHANGE 1: Process full data then split to get 'test_processed' for the stationary plot
+    Tp_processed = preprocess(Tp)
+    steps = len(test_raw)
+    train_processed = Tp_processed[:-steps]
+    test_processed = Tp_processed[-steps:]
+    
+    check_stationarity(train_processed)
     # make_basic_plot(train_processed)
     # make_acf_plots(train_processed)
     # exit()
@@ -177,27 +151,34 @@ def main():
     ar, ma = 1, 2
     results, _ = fit_model(train_processed, ar, ma)
 
-    steps = len(test_raw)
-    
-    # --- ADDED (Gemini): Forecast extraction and interval calculation ---
+    # CHANGE 2: Use get_forecast to obtain the mean AND standard error (se_mean)
     forecast_obj = results.get_forecast(steps=steps)
     forecast_diff = forecast_obj.predicted_mean
-    se_diff = forecast_obj.se_mean
+    se_diff = forecast_obj.se_mean 
+
+    # --- NEW: Logic for Plot 1 (Stationary Domain) ---
+    lower_diff = forecast_diff - (1.96 * se_diff)
+    upper_diff = forecast_diff + (1.96 * se_diff)
     
+    plot_validation(train_processed, test_processed, forecast_diff, 
+                    lower_bound=lower_diff, upper_bound=upper_diff, 
+                    title="Stationary Domain Validation")
+
+    # --- NEW: Logic for Plot 2 (Original Domain) ---
     forecast_final = undo_preprocess(forecast_diff, train_raw, TIME_STEPS_PER_WEEK)
     
+    # Calculate integrated uncertainty (expanding cone)
     h_array = np.arange(1, steps + 1)
     se_integrated = se_diff * np.sqrt(h_array)
-    
-    lower_bound = forecast_final - (1.96 * se_integrated)
-    upper_bound = forecast_final + (1.96 * se_integrated)
-    # -----------------------------------------------------------
+    lower_final = forecast_final - (1.96 * se_integrated)
+    upper_final = forecast_final + (1.96 * se_integrated)
 
-    print(results.summary())
+    #print(results.summary())
     
-    # UPDATED: Pass bounds to plotting function
-    plot_validation(train_raw, test_raw, forecast_final, lower_bound=lower_bound, upper_bound=upper_bound)
-
+    # CHANGE 3: Pass the new bounds to the validation plot
+    plot_validation(train_raw, test_raw, forecast_final, 
+                    lower_bound=lower_final, upper_bound=upper_final, 
+                    title="Original Domain Validation")
 
 if __name__ == "__main__":
     main()
