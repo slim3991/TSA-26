@@ -106,34 +106,41 @@ def main():
 
     ar, ma = 1,2
     #ar, ma = 9,1
-    n = 100
-    mse_ARMA = np.zeros(nr_prediction_steps)
-    mse_noARMA = np.zeros(nr_prediction_steps)
+    n = 1000
+    # Byt ut initialiseringen av MSE-variablerna
+    mre_ARMA = np.zeros(nr_prediction_steps)
+    mre_noARMA = np.zeros(nr_prediction_steps)
 
     for i in range(n):
         print("Starting prediction", i+1)
-        prediction_time = np.random.randint(TIME_STEPS_PER_DAY*7) # random time point during fourth week
-        #last_training_step = TIME_STEPS_PER_DAY*7*(nr_of_training_weeks-1) + prediction_time
+        prediction_time = np.random.randint(TIME_STEPS_PER_DAY*7) 
         last_training_step = TIME_STEPS_PER_DAY*7*(nr_of_training_weeks-1) + prediction_time
+        
         Tp_copy = Tp.copy()
-        #Tp_train_and_predict = Tp_copy[0:last_training_step + nr_prediction_steps]
         Tp_train_and_predict = Tp_copy[prediction_time:last_training_step + nr_prediction_steps]
         train_raw, test_raw = make_train_test_split(Tp_train_and_predict, last_training_step-prediction_time)
         train_processed = preprocess(train_raw, seasonal_lag)
 
         results, _ = fit_model(train_processed, ar, ma)
         forecast_diff = results.forecast(steps=nr_prediction_steps)
-        forecast_final = undo_preprocess(forecast_diff, train_raw, seasonal_lag) # With ARMA
-        forecast_final0 = undo_preprocess([0]*len(forecast_diff), train_raw, seasonal_lag) # With ARMA put to 0
-        mse_ARMA += (forecast_final-test_raw)**2
-        mse_noARMA += (forecast_final0-test_raw)**2
-    mse_ARMA = mse_ARMA / n
-    mse_noARMA = mse_noARMA / n
-    plt.plot(np.arange(len(mse_ARMA))+1, mse_ARMA , label="ARMA")
-    plt.plot(np.arange(len(mse_noARMA))+1, mse_noARMA, label="No ARMA")
-    plt.title("ARMA vs No ARMA")
+        forecast_final = undo_preprocess(forecast_diff, train_raw, seasonal_lag) 
+        forecast_final0 = undo_preprocess([0]*len(forecast_diff), train_raw, seasonal_lag) 
+        
+        # Beräkna absolut relativt fel. 
+        # En liten konstant (1e-8) adderas i nämnaren för stabilitet 
+        mre_ARMA += np.abs((forecast_final - test_raw) / (test_raw + 1e-8))
+        mre_noARMA += np.abs((forecast_final0 - test_raw) / (test_raw + 1e-8))
+        
+    # Genomsnitt över n iterationer
+    mre_ARMA = mre_ARMA / n
+    mre_noARMA = mre_noARMA / n
+    
+    # Uppdatera grafritningen för det nya felmåttet
+    plt.plot(np.arange(len(mre_ARMA))+1, mre_ARMA , label="ARMA")
+    plt.plot(np.arange(len(mre_noARMA))+1, mre_noARMA, label="No ARMA")
+    plt.title("ARMA vs No ARMA (Mean Absolute Relative Error)")
     plt.xlabel("Prediction Time Steps")
-    plt.ylabel("MSE")
+    plt.ylabel("Relative Error")
     plt.legend(loc='upper left')
     plt.show()
     #check_stationarity(train_processed)
