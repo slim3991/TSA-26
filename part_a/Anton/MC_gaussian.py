@@ -100,6 +100,7 @@ def plot_results(
     test_raw: np.ndarray,
     paths: np.ndarray,
     alpha: float,
+    point_forecast: np.ndarray,
 ) -> tuple:
     lower  = np.percentile(paths, 100 * alpha / 2,       axis=0)
     upper  = np.percentile(paths, 100 * (1 - alpha / 2), axis=0)
@@ -114,6 +115,8 @@ def plot_results(
             color="steelblue", alpha=0.4, linewidth=0.8, label="Train (last 2 weeks)")
     ax.plot(test_idx, test_raw,
             color="black", linewidth=0.9, label="Actual (test)")
+    ax.plot(test_idx, point_forecast,
+            color="green", linewidth=1.2, label="get_forecast() point forecast")
     ax.plot(test_idx, median,
             color="red", linestyle="--", linewidth=1.2, label="Gaussian MC median")
     ax.fill_between(test_idx, lower, upper,
@@ -158,11 +161,18 @@ def main():
     print(f"  MA params : {results.maparams}")
     print(f"  σ̂         : {resid.std():.4f}  (used as Gaussian std)")
 
+    # Point forecast from model: get_forecast gives W_{T+1}..W_{T+steps},
+    # reconstruct to original domain the same way as the MC paths
+    T             = len(train_raw)
+    seasonal_base = train_raw[T - TIME_STEPS_PER_WEEK : T - TIME_STEPS_PER_WEEK + steps]
+    W_forecast    = results.get_forecast(steps=steps).predicted_mean
+    point_forecast = seasonal_diff[-1] + np.cumsum(W_forecast) + seasonal_base
+
     print(f"\nRunning {N_SIMS} Gaussian MC simulations ({steps} steps ahead)...")
     rng   = np.random.default_rng(SEED)
     paths = gaussian_forecast(results, seasonal_diff, train_raw, steps, N_SIMS, rng)
 
-    lower, upper, median = plot_results(train_raw, test_raw, paths, ALPHA)
+    lower, upper, median = plot_results(train_raw, test_raw, paths, ALPHA, point_forecast)
     print_coverage(test_raw, lower, upper, ALPHA)
 
 

@@ -124,19 +124,16 @@ def plot_acf_squared(u_hat: np.ndarray) -> None:
     plt.show()
 
 
-def plot_gaussianity(u_hat: np.ndarray) -> None:
+def plot_histogram(u_hat: np.ndarray) -> None:
     """
-    Check 4: Histogram and Q-Q plot.
+    Check 4a: Histogram of standardised innovations.
 
     The Gaussian assumption underlies the analytical confidence intervals
     (the 1.96 * sigma_h formula from Theorem 4.15). If the residuals are
     heavy-tailed or skewed, the bootstrap resampling approach is preferable
     over assuming N(0, sigma^2) for the Monte Carlo draws.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4))
-
-    # Histogram with fitted Gaussian overlay
-    ax = axes[0]
+    fig, ax = plt.subplots(figsize=(7, 4))
     u_std = (u_hat - u_hat.mean()) / u_hat.std()
     ax.hist(u_std, bins=60, density=True, color="steelblue",
             alpha=0.6, label="Standardised $\\hat{U}_t$")
@@ -148,20 +145,28 @@ def plot_gaussianity(u_hat: np.ndarray) -> None:
     ax.set_ylabel("Density")
     ax.legend()
     ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
 
-    # Q-Q plot
-    ax = axes[1]
+
+def plot_qq(u_hat: np.ndarray) -> None:
+    """
+    Check 4b: Q-Q plot.
+
+    Points should fall on the reference line if innovations are Gaussian.
+    Deviations in the tails indicate heavy tails or skewness, favouring
+    bootstrap over Gaussian Monte Carlo draws.
+    """
+    fig, ax = plt.subplots(figsize=(7, 4))
     (osm, osr), (slope, intercept, r) = stats.probplot(u_hat, dist="norm")
     ax.scatter(osm, osr, color="steelblue", s=4, alpha=0.5, label="Innovations")
     ax.plot(osm, slope * np.array(osm) + intercept,
             color="red", linewidth=2, label="Normal reference line")
-    ax.set_title("Check 4b — Q-Q plot\n"
-                 "Expected: points on the line if Gaussian; tails reveal heavy tails")
+    ax.set_title("Residual Q-Q plot on training data")
     ax.set_xlabel("Theoretical quantiles")
     ax.set_ylabel("Sample quantiles")
     ax.legend()
     ax.grid(True, alpha=0.3)
-
     plt.tight_layout()
     plt.show()
 
@@ -227,7 +232,8 @@ def main():
     plot_time_series(u_hat)
     plot_acf_levels(u_hat)
     plot_acf_squared(u_hat)
-    plot_gaussianity(u_hat)
+    plot_histogram(u_hat)
+    plot_qq(u_hat)
     run_ljung_box(u_hat)
 
     print("\nInterpretation guide:")
